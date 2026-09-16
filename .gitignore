@@ -1,0 +1,11 @@
+build/
+out/
+*.o
+*.obj
+*.exe
+*.a
+*.lib
+compile_commands.json
+*.db
+*.sqlite3
+.DS_Store
