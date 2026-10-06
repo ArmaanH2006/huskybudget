@@ -7,6 +7,7 @@ add_library(budget_core
     src/Money.cpp
     src/Date.cpp
     src/InMemoryRepository.cpp
+    src/JsonFileRepository.cpp
 )
 target_include_directories(budget_core PUBLIC include third_party)
 
@@ -19,6 +20,7 @@ add_executable(tests
     tests/test_date.cpp
     tests/test_transaction.cpp
     tests/test_repository.cpp
+    tests/test_json_repository.cpp
 )
 target_link_libraries(tests PRIVATE budget_core)
 add_test(NAME unit COMMAND tests)
