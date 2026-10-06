@@ -9,3 +9,4 @@ compile_commands.json
 *.db
 *.sqlite3
 .DS_Store
+data/huskybudget.json

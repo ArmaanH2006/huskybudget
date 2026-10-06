@@ -3,6 +3,8 @@ project(huskybudget LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+find_package(Threads REQUIRED)
+
 add_library(budget_core
     src/Money.cpp
     src/Date.cpp
@@ -12,7 +14,12 @@ add_library(budget_core
 target_include_directories(budget_core PUBLIC include third_party)
 
 add_executable(huskybudget apps/server_main.cpp)
-target_link_libraries(huskybudget PRIVATE budget_core)
+target_link_libraries(huskybudget PRIVATE budget_core Threads::Threads)
+if(WIN32)
+    # The HTTP library needs Windows networking (Winsock) and Windows 10+.
+    target_link_libraries(huskybudget PRIVATE ws2_32)
+    target_compile_definitions(huskybudget PRIVATE _WIN32_WINNT=0x0A00)
+endif()
 
 enable_testing()
 add_executable(tests
