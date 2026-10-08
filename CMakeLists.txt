@@ -11,6 +11,7 @@ add_library(budget_core
     src/InMemoryRepository.cpp
     src/JsonFileRepository.cpp
     src/Summary.cpp
+    src/SampleData.cpp
 )
 target_include_directories(budget_core PUBLIC include third_party)
 
@@ -22,6 +23,9 @@ if(WIN32)
     target_compile_definitions(huskybudget PRIVATE _WIN32_WINNT=0x0A00)
 endif()
 
+add_executable(seed apps/seed_main.cpp)
+target_link_libraries(seed PRIVATE budget_core)
+
 enable_testing()
 add_executable(tests
     tests/test_money.cpp
@@ -30,6 +34,7 @@ add_executable(tests
     tests/test_repository.cpp
     tests/test_json_repository.cpp
     tests/test_summary.cpp
+    tests/test_sample_data.cpp
 )
 target_link_libraries(tests PRIVATE budget_core)
 add_test(NAME unit COMMAND tests)
