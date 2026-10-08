@@ -12,6 +12,7 @@ add_library(budget_core
     src/JsonFileRepository.cpp
     src/Summary.cpp
     src/SampleData.cpp
+    src/CsvImporter.cpp
 )
 target_include_directories(budget_core PUBLIC include third_party)
 
@@ -35,6 +36,7 @@ add_executable(tests
     tests/test_json_repository.cpp
     tests/test_summary.cpp
     tests/test_sample_data.cpp
+    tests/test_csv_importer.cpp
 )
 target_link_libraries(tests PRIVATE budget_core)
 add_test(NAME unit COMMAND tests)

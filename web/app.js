@@ -34,6 +34,50 @@ async function loadSummary(month) {
   setMoney("income", s.income);
   setMoney("spending", s.spending);
   setMoney("net", s.net);
+  drawCategoryChart(s.spendingByCategory, s.spending.cents);
+}
+
+// One horizontal bar per category, longest first. The server already sorted
+// them biggest-first. Bar length is relative to the biggest category; the
+// percentage is each category's share of all spending.
+function drawCategoryChart(categories, totalCents) {
+  const chart = document.getElementById("category-chart");
+  const empty = document.getElementById("chart-empty");
+  chart.innerHTML = "";
+  empty.hidden = categories.length > 0;
+  if (categories.length === 0) return;
+
+  const biggest = categories[0].amount.cents;
+  for (const c of categories) {
+    const share = Math.round((c.amount.cents / totalCents) * 100);
+
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.setAttribute("role", "row");
+    row.title = c.category + ": " + c.amount.display + " (" + share + "% of spending)";
+
+    const label = document.createElement("span");
+    label.className = "bar-label";
+    label.textContent = c.category;
+
+    const track = document.createElement("div");
+    track.className = "bar-track";
+    const fill = document.createElement("div");
+    fill.className = "bar-fill";
+    fill.style.width = (c.amount.cents / biggest) * 100 + "%";
+    track.appendChild(fill);
+
+    const value = document.createElement("span");
+    value.className = "bar-value";
+    value.textContent = c.amount.display;
+    const pct = document.createElement("span");
+    pct.className = "bar-share";
+    pct.textContent = share + "%";
+    value.appendChild(pct);
+
+    row.append(label, track, value);
+    chart.appendChild(row);
+  }
 }
 
 async function loadTransactions(month) {

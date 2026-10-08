@@ -2,7 +2,7 @@
 body  { font-family: system-ui, sans-serif; max-width: 860px; margin: 32px auto; padding: 0 16px; color: #1f2933; background: #f7f8fa; }
 h1    { margin: 0; }
 h2    { font-size: 16px; margin: 0 0 12px; }
-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+header { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .month-picker { display: flex; gap: 8px; align-items: center; color: #616e7c; font-size: 14px; }
 
 .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
@@ -28,4 +28,25 @@ th    { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color
 .delete { border: none; background: none; color: #9aa5b1; cursor: pointer; font-size: 18px; padding: 0 6px; }
 .delete:hover { color: #c62828; }
 
-@media (max-width: 600px) { .cards { grid-template-columns: 1fr; } }
+/* ---- Spending by category: one horizontal bar per category -------------- */
+.bars      { display: flex; flex-direction: column; gap: 4px; }
+.bar-row   { display: grid; grid-template-columns: 9.5em 1fr 9em; gap: 12px; align-items: center; padding: 3px 4px; border-radius: 6px; cursor: default; }
+.bar-row:hover { background: #f3f5f7; }
+.bar-label { font-size: 14px; }
+.bar-track { height: 12px; background: #eef1f4; border-radius: 0 4px 4px 0; }
+.bar-fill  { height: 100%; background: #2a78d6; border-radius: 0 4px 4px 0; min-width: 2px; }
+.bar-value { font-size: 14px; text-align: right; font-variant-numeric: tabular-nums; }
+.bar-share { color: #616e7c; margin-left: 6px; display: inline-block; min-width: 3.2em; }
+.bar-row:hover .bar-fill  { background: #1f5fae; }
+.bar-row:hover .bar-label,
+.bar-row:hover .bar-value { font-weight: 600; }
+
+@media (max-width: 600px) {
+  .cards   { grid-template-columns: 1fr; }
+  .bar-row { grid-template-columns: 1fr auto; grid-template-areas: "label value" "track track"; gap: 4px 12px; }
+  .bar-label { grid-area: label; }
+  .bar-track { grid-area: track; }
+  .bar-value { grid-area: value; }
+  table    { font-size: 14px; }
+  th, td   { padding: 8px 4px; }
+}
