@@ -1,5 +1,7 @@
 #pragma once
+#include <optional>
 #include <string>
+#include <string_view>
 
 #include "budget/Date.h"
 #include "budget/Money.h"
@@ -18,5 +20,23 @@ struct Transaction {
     std::string note;
     TxnKind     kind = TxnKind::Expense;
 };
+
+// "expense" / "income" / "transfer"
+inline const char* txnKindName(TxnKind kind) {
+    switch (kind) {
+        case TxnKind::Income:   return "income";
+        case TxnKind::Transfer: return "transfer";
+        case TxnKind::Expense:  break;
+    }
+    return "expense";
+}
+
+// The reverse. Returns nothing for anything else.
+inline std::optional<TxnKind> parseTxnKind(std::string_view text) {
+    if (text == "expense")  return TxnKind::Expense;
+    if (text == "income")   return TxnKind::Income;
+    if (text == "transfer") return TxnKind::Transfer;
+    return std::nullopt;
+}
 
 }  // namespace budget
