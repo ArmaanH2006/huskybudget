@@ -4,28 +4,50 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>HuskyBudget</title>
-  <style>
-    body  { font-family: system-ui, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 16px; color: #1f2933; }
-    h1    { margin-bottom: 4px; }
-    #status { color: #616e7c; margin-bottom: 24px; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #e4e7eb; }
-    th    { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: #616e7c; }
-    td.amount, th.amount { text-align: right; font-variant-numeric: tabular-nums; }
-    .out  { color: #c62828; }
-    .in   { color: #2e7d32; }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>HuskyBudget</h1>
-  <p id="status">Loading…</p>
+  <header>
+    <h1>HuskyBudget</h1>
+    <label class="month-picker">
+      Month
+      <input type="month" id="month">
+    </label>
+  </header>
 
-  <table>
-    <thead>
-      <tr><th>Date</th><th>Merchant</th><th>Category</th><th class="amount">Amount</th></tr>
-    </thead>
-    <tbody id="rows"></tbody>
-  </table>
+  <section class="cards">
+    <div class="card"><span class="label">Income</span><span class="value in" id="income">–</span></div>
+    <div class="card"><span class="label">Spending</span><span class="value out" id="spending">–</span></div>
+    <div class="card"><span class="label">Net</span><span class="value" id="net">–</span></div>
+  </section>
+
+  <section class="panel">
+    <h2>Add a transaction</h2>
+    <form id="add-form">
+      <input type="date" name="date" required>
+      <select name="kind">
+        <option value="expense">Expense</option>
+        <option value="income">Income</option>
+      </select>
+      <input name="amount" placeholder="Amount" inputmode="decimal" required>
+      <input name="category" placeholder="Category" list="categories" required>
+      <input name="merchant" placeholder="Merchant (optional)">
+      <button type="submit">Add</button>
+    </form>
+    <datalist id="categories"></datalist>
+    <p id="form-error" class="error" hidden></p>
+  </section>
+
+  <section class="panel">
+    <h2>Transactions</h2>
+    <p id="status" class="muted">Loading…</p>
+    <table>
+      <thead>
+        <tr><th>Date</th><th>Merchant</th><th>Category</th><th class="num">Amount</th><th></th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </section>
 
   <script src="app.js"></script>
 </body>

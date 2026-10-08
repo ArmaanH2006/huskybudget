@@ -8,12 +8,14 @@
 #include <iostream>
 #include <iterator>
 #include <mutex>
+#include <string>
 #include <vector>
 
 #include "httplib.h"
 #include "json.hpp"
 
 #include "budget/JsonFileRepository.h"
+#include "budget/Summary.h"
 
 using nlohmann::json;
 using namespace budget;
@@ -23,12 +25,16 @@ namespace {
 constexpr int kUserId = 1;            // single user until login exists
 constexpr int kPort   = 8080;
 
-// Turns a Transaction into the JSON the browser receives.
-// "amount" is ready to display; "cents" is there for any math the page does.
+// ---------------------------------------------------------------------------
+// Turning our types into the JSON the browser receives.
+// Every amount is sent twice: a display string ("-$12.50") and exact cents.
+// ---------------------------------------------------------------------------
+
+json moneyJson(Money m) {
+    return {{"display", m.toString()}, {"cents", m.cents()}};
+}
+
 json toApiJson(const Transaction& t) {
-    const char* kind = t.kind == TxnKind::Income   ? "income"
-                     : t.kind == TxnKind::Transfer ? "transfer"
-                                                   : "expense";
     return {
         {"id",       t.id},
         {"date",     t.date.toIso()},
@@ -37,26 +43,112 @@ json toApiJson(const Transaction& t) {
         {"category", t.category},
         {"merchant", t.merchant},
         {"note",     t.note},
-        {"kind",     kind},
+        {"kind",     txnKindName(t.kind)},
     };
 }
 
+json toApiJson(const YearMonth& month, const MonthSummary& s) {
+    json categories = json::array();
+    for (const CategoryTotal& c : s.spendingByCategory) {
+        categories.push_back({{"category", c.category}, {"amount", moneyJson(c.total)}});
+    }
+    return {
+        {"month",              month.toString()},
+        {"income",             moneyJson(s.income)},
+        {"spending",           moneyJson(s.spending)},
+        {"net",                moneyJson(s.net)},
+        {"transactionCount",   s.transactionCount},
+        {"spendingByCategory", categories},
+    };
+}
+
+void sendError(httplib::Response& res, int status, const std::string& message) {
+    res.status = status;
+    res.set_content(json{{"error", message}}.dump(), "application/json");
+}
+
+// ---------------------------------------------------------------------------
+// Reading a new transaction from the browser.
+//
+// Expects JSON like:
+//   {"date":"2026-10-07", "amount":"12.50", "kind":"expense",
+//    "category":"Dining", "merchant":"Chipotle", "note":""}
+//
+// The user always types a positive amount. "kind" decides the sign:
+// expenses and transfers are stored negative, income positive.
+// On bad input, fills in `error` and returns nothing.
+// ---------------------------------------------------------------------------
+std::optional<Transaction> transactionFromRequest(const std::string& body, std::string& error) {
+    json j = json::parse(body, nullptr, /*allow_exceptions=*/false);
+    if (j.is_discarded() || !j.is_object()) { error = "body must be a JSON object"; return std::nullopt; }
+
+    auto text = [&](const char* key) -> std::string {
+        if (!j.contains(key) || !j[key].is_string()) return "";
+        return j[key].get<std::string>();
+    };
+
+    Transaction t;
+    t.userId = kUserId;
+
+    auto date = Date::parse(text("date"));
+    if (!date) { error = "date must look like 2026-10-07"; return std::nullopt; }
+    t.date = *date;
+
+    auto amount = Money::parse(text("amount"));
+    if (!amount)              { error = "amount must be a number like 12.50"; return std::nullopt; }
+    if (!(Money() < *amount)) { error = "amount must be more than $0.00";     return std::nullopt; }
+
+    std::string kindText = text("kind").empty() ? "expense" : text("kind");
+    auto kind = parseTxnKind(kindText);
+    if (!kind) { error = "kind must be expense, income, or transfer"; return std::nullopt; }
+    t.kind   = *kind;
+    t.amount = (t.kind == TxnKind::Income) ? *amount : -*amount;
+
+    t.category = text("category");
+    if (t.category.empty()) { error = "category is required"; return std::nullopt; }
+    t.merchant = text("merchant");
+    t.note     = text("note");
+    return t;
+}
+
+// Reads ?month=YYYY-MM, or ?from=&to=. Defaults to "everything".
+bool readDateRange(const httplib::Request& req, Date& from, Date& to, std::string& error) {
+    from = Date{1900, 1, 1};
+    to   = Date{9999, 12, 31};
+    if (req.has_param("month")) {
+        auto m = YearMonth::parse(req.get_param_value("month"));
+        if (!m) { error = "month must look like 2026-10"; return false; }
+        from = m->firstDay();
+        to   = m->lastDay();
+        return true;
+    }
+    if (req.has_param("from")) {
+        auto d = Date::parse(req.get_param_value("from"));
+        if (!d) { error = "bad 'from' date"; return false; }
+        from = *d;
+    }
+    if (req.has_param("to")) {
+        auto d = Date::parse(req.get_param_value("to"));
+        if (!d) { error = "bad 'to' date"; return false; }
+        to = *d;
+    }
+    return true;
+}
+
 // A handful of transactions so the page isn't empty the first time.
-// The real 12-month seed generator comes in week 2.
+// The real 12-month seed generator comes later this week.
 void addSampleDataIfEmpty(Repository& repo) {
-    Date everything_from{1900, 1, 1};
-    Date everything_to{9999, 12, 31};
-    if (!repo.transactionsInRange(kUserId, everything_from, everything_to).empty()) return;
+    if (!repo.transactionsInRange(kUserId, Date{1900, 1, 1}, Date{9999, 12, 31}).empty()) return;
 
     struct Sample { const char* date; const char* amount; const char* category;
                     const char* merchant; TxnKind kind; };
     const Sample samples[] = {
-        {"2026-10-01", "2400.00", "Salary",    "Employer",     TxnKind::Income},
-        {"2026-10-01", "-1100.00", "Rent",     "Landlord",     TxnKind::Expense},
-        {"2026-10-02", "-64.18",  "Groceries", "Stop & Shop",  TxnKind::Expense},
-        {"2026-10-03", "-12.50",  "Dining",    "Chipotle",     TxnKind::Expense},
-        {"2026-10-04", "-5.25",   "Coffee",    "Dunkin",       TxnKind::Expense},
-        {"2026-10-05", "-15.99",  "Subscriptions", "Spotify",  TxnKind::Expense},
+        {"2026-10-01", "2400.00",  "Salary",        "Employer",    TxnKind::Income},
+        {"2026-10-01", "-1100.00", "Rent",          "Landlord",    TxnKind::Expense},
+        {"2026-10-02", "-64.18",   "Groceries",     "Stop & Shop", TxnKind::Expense},
+        {"2026-10-03", "-12.50",   "Dining",        "Chipotle",    TxnKind::Expense},
+        {"2026-10-04", "-5.25",    "Coffee",        "Dunkin",      TxnKind::Expense},
+        {"2026-10-05", "-15.99",   "Subscriptions", "Spotify",     TxnKind::Expense},
     };
     for (const Sample& s : samples) {
         Transaction t;
@@ -91,41 +183,71 @@ int main() {
     std::mutex repoMutex;
 
     httplib::Server server;
-
-    // Serve index.html, app.js, etc. from the web/ folder.
     server.set_mount_point("/", "./web");
 
     server.Get("/api/health", [](const httplib::Request&, httplib::Response& res) {
         res.set_content(R"({"status":"ok"})", "application/json");
     });
 
-    // GET /api/transactions?from=2026-10-01&to=2026-10-31   (both optional)
+    // GET /api/transactions?month=2026-10      (or ?from=&to=, or nothing for all)
     server.Get("/api/transactions", [&](const httplib::Request& req, httplib::Response& res) {
-        // 1. Read the request.
-        Date from{1900, 1, 1};
-        Date to{9999, 12, 31};
-        if (req.has_param("from")) {
-            auto d = Date::parse(req.get_param_value("from"));
-            if (!d) { res.status = 400; res.set_content(R"({"error":"bad 'from' date"})", "application/json"); return; }
-            from = *d;
-        }
-        if (req.has_param("to")) {
-            auto d = Date::parse(req.get_param_value("to"));
-            if (!d) { res.status = 400; res.set_content(R"({"error":"bad 'to' date"})", "application/json"); return; }
-            to = *d;
-        }
+        Date from, to;
+        std::string error;
+        if (!readDateRange(req, from, to, error)) return sendError(res, 400, error);
 
-        // 2. Ask the repository.
         std::vector<Transaction> txns;
         {
             std::lock_guard<std::mutex> lock(repoMutex);
             txns = repo.transactionsInRange(kUserId, from, to);
         }
 
-        // 3. Send it back as JSON.
         json out = json::array();
         for (const Transaction& t : txns) out.push_back(toApiJson(t));
         res.set_content(out.dump(), "application/json");
+    });
+
+    // POST /api/transactions   body: {"date":..., "amount":..., "kind":..., "category":..., ...}
+    server.Post("/api/transactions", [&](const httplib::Request& req, httplib::Response& res) {
+        std::string error;
+        auto txn = transactionFromRequest(req.body, error);
+        if (!txn) return sendError(res, 400, error);
+
+        {
+            std::lock_guard<std::mutex> lock(repoMutex);
+            txn->id = repo.addTransaction(*txn);
+        }
+
+        res.status = 201;   // "Created"
+        res.set_content(toApiJson(*txn).dump(), "application/json");
+    });
+
+    // DELETE /api/transactions/7
+    server.Delete(R"(/api/transactions/(\d+))", [&](const httplib::Request& req, httplib::Response& res) {
+        int id = std::stoi(req.matches[1].str());
+
+        bool removed;
+        {
+            std::lock_guard<std::mutex> lock(repoMutex);
+            removed = repo.deleteTransaction(id, kUserId);
+        }
+
+        if (!removed) return sendError(res, 404, "no transaction with id " + std::to_string(id));
+        res.status = 204;   // "No Content": it worked, nothing to send back
+    });
+
+    // GET /api/summary?month=2026-10
+    server.Get("/api/summary", [&](const httplib::Request& req, httplib::Response& res) {
+        auto month = YearMonth::parse(req.get_param_value("month"));
+        if (!month) return sendError(res, 400, "month must look like 2026-10");
+
+        std::vector<Transaction> txns;
+        {
+            std::lock_guard<std::mutex> lock(repoMutex);
+            txns = repo.transactionsInRange(kUserId, month->firstDay(), month->lastDay());
+        }
+
+        MonthSummary summary = summarize(txns);    // all the math lives in Summary.cpp
+        res.set_content(toApiJson(*month, summary).dump(), "application/json");
     });
 
     std::cout << "HuskyBudget running at http://localhost:" << kPort << "\n"

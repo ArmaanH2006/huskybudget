@@ -1,0 +1,31 @@
+* { box-sizing: border-box; }
+body  { font-family: system-ui, sans-serif; max-width: 860px; margin: 32px auto; padding: 0 16px; color: #1f2933; background: #f7f8fa; }
+h1    { margin: 0; }
+h2    { font-size: 16px; margin: 0 0 12px; }
+header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.month-picker { display: flex; gap: 8px; align-items: center; color: #616e7c; font-size: 14px; }
+
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+.card  { background: #fff; border: 1px solid #e4e7eb; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: #616e7c; }
+.value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.panel { background: #fff; border: 1px solid #e4e7eb; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+form   { display: flex; flex-wrap: wrap; gap: 8px; }
+input, select, button { font: inherit; padding: 8px 10px; border: 1px solid #cbd2d9; border-radius: 6px; }
+input[name="amount"]   { width: 150px; }
+input[name="category"], input[name="merchant"] { flex: 1; min-width: 140px; }
+button[type="submit"]  { background: #1f6feb; color: #fff; border-color: #1f6feb; cursor: pointer; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid #e4e7eb; }
+th    { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #616e7c; }
+.num  { text-align: right; font-variant-numeric: tabular-nums; }
+.in   { color: #2e7d32; }
+.out  { color: #c62828; }
+.muted { color: #616e7c; margin-top: 0; }
+.error { color: #c62828; margin: 10px 0 0; }
+.delete { border: none; background: none; color: #9aa5b1; cursor: pointer; font-size: 18px; padding: 0 6px; }
+.delete:hover { color: #c62828; }
+
+@media (max-width: 600px) { .cards { grid-template-columns: 1fr; } }
