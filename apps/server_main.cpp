@@ -15,6 +15,7 @@
 #include "httplib.h"
 #include "json.hpp"
 
+#include "budget/Alerts.h"
 #include "budget/BudgetStatus.h"
 #include "budget/CsvImporter.h"
 #include "budget/JsonFileRepository.h"
@@ -75,6 +76,18 @@ json toApiJson(const BudgetStatus& b) {
         {"percentUsed", b.percentUsed},
         {"tooEarly",    b.tooEarly},
         {"health",      budgetHealthName(b.health)},
+    };
+}
+
+json toApiJson(const Alert& a) {
+    return {
+        {"kind",          alertKindName(a.kind)},
+        {"date",          a.date.toIso()},
+        {"transactionId", a.transactionId},
+        {"merchant",      a.merchant},
+        {"category",      a.category},
+        {"amount",        moneyJson(a.amount)},
+        {"reason",        a.reason},
     };
 }
 
@@ -259,7 +272,7 @@ int main() {
         res.status = 204;   // "No Content": it worked, nothing to send back
     });
 
-        // POST /api/import     body: the text of a CSV file
+    // POST /api/import     body: the text of a CSV file
     //
     // All or nothing: if any row has a problem, nothing is imported and every
     // problem is reported, so the user can fix the file and try again without
@@ -348,6 +361,26 @@ int main() {
         }
         res.set_content(json{{"category", b.category}, {"limit", moneyJson(b.monthlyLimit)}}.dump(),
                         "application/json");
+    });
+
+    // GET /api/alerts?month=2026-10
+    // Charges in that month that look wrong. The rules compare each charge to
+    // everything before it, so this loads the whole history up to the month's end.
+    server.Get("/api/alerts", [&](const httplib::Request& req, httplib::Response& res) {
+        auto month = YearMonth::parse(req.get_param_value("month"));
+        if (!month) return sendError(res, 400, "month must look like 2026-10");
+
+        std::vector<Transaction> history;
+        {
+            std::lock_guard<std::mutex> lock(repoMutex);
+            history = repo.transactionsInRange(kUserId, Date{1900, 1, 1}, month->lastDay());
+        }
+
+        json out = json::array();
+        for (const Alert& a : findAlerts(history, *month)) {
+            out.push_back(toApiJson(a));               // all the rules live in Alerts.cpp
+        }
+        res.set_content(out.dump(), "application/json");
     });
 
     std::cout << "HuskyBudget running at http://localhost:" << kPort << "\n"

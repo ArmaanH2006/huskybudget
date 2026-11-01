@@ -134,6 +134,59 @@ function budgetMessage(b) {
   return message;
 }
 
+// ---- alerts ----------------------------------------------------------------
+
+const alertTitles = {
+  "unusual-amount": "Unusually large",
+  "duplicate":      "Possible double charge",
+  "new-merchant":   "Big buy, new store",
+  "burst":          "Spending burst",
+};
+
+// Ids of the transactions that have an alert, so their rows can be marked.
+let flaggedIds = new Set();
+
+async function loadAlerts(month) {
+  const alerts = await getJson("/api/alerts?month=" + month);
+  const list = document.getElementById("alerts");
+  document.getElementById("alerts-empty").hidden = alerts.length > 0;
+  list.innerHTML = "";
+  flaggedIds = new Set(alerts.map(a => a.transactionId).filter(id => id !== 0));
+
+  for (const a of alerts) {
+    const item = document.createElement("li");
+    item.className = "alert " + a.kind;
+
+    const top = document.createElement("div");
+    top.className = "alert-top";
+    const title = document.createElement("span");
+    title.className = "alert-title";
+    title.textContent = alertTitles[a.kind];
+    const when = document.createElement("span");
+    when.className = "alert-when";
+    when.textContent = a.date + (a.merchant ? " · " + a.merchant : "");
+    title.appendChild(when);
+    const amount = document.createElement("span");
+    amount.className = "alert-amount";
+    amount.textContent = a.amount.display;
+    top.append(title, amount);
+
+    const reason = document.createElement("p");
+    reason.className = "alert-reason";
+    reason.textContent = a.reason;              // the server explains why, in plain English
+
+    item.append(top, reason);
+    list.appendChild(item);
+  }
+}
+
+// Puts a warning mark on table rows that have an alert.
+function markFlaggedRows() {
+  for (const tr of document.getElementById("rows").children) {
+    tr.classList.toggle("flagged", flaggedIds.has(Number(tr.dataset.id)));
+  }
+}
+
 async function loadTransactions(month) {
   const status = document.getElementById("status");
   const rows   = document.getElementById("rows");
@@ -142,6 +195,7 @@ async function loadTransactions(month) {
   rows.innerHTML = "";
   for (const t of transactions) {
     const tr = document.createElement("tr");
+    tr.dataset.id = t.id;                    // so alerts can find this row
 
     for (const text of [t.date, t.merchant, t.category]) {
       const td = document.createElement("td");
@@ -183,7 +237,8 @@ async function loadTransactions(month) {
 async function refresh() {
   const month = monthInput.value;
   try {
-    await Promise.all([loadSummary(month), loadBudgets(month), loadTransactions(month)]);
+    await Promise.all([loadSummary(month), loadBudgets(month), loadAlerts(month), loadTransactions(month)]);
+    markFlaggedRows();                       // needs both the alerts and the table
   } catch (err) {
     document.getElementById("status").textContent = "Couldn't reach the server: " + err.message;
   }

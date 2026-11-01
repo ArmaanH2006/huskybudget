@@ -50,6 +50,18 @@ th    { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color
 .over     .budget-fill { background: #c62828; }
 .over     .badge       { background: #fdecea; color: #c62828; }
 
+/* ---- Alerts: one card per alert, with a colored edge --------------------- */
+.alerts        { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.alert         { border-left: 4px solid #d99a00; background: #fffaf0; border-radius: 6px; padding: 10px 12px; }
+.alert.duplicate { border-left-color: #c62828; background: #fdf3f2; }
+.alert-top     { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 14px; }
+.alert-title   { font-weight: 600; }
+.alert-when    { color: #616e7c; font-weight: 400; margin-left: 8px; }
+.alert-amount  { font-weight: 600; font-variant-numeric: tabular-nums; }
+.alert-reason  { margin: 4px 0 0; font-size: 13px; color: #3e4c59; }
+tr.flagged td  { background: #fffaf0; }
+tr.flagged td:first-child::before { content: "\26A0  "; color: #d99a00; }
+
 /* ---- Spending by category: one horizontal bar per category -------------- */
 .bars      { display: flex; flex-direction: column; gap: 4px; }
 .bar-row   { display: grid; grid-template-columns: 9.5em 1fr 9em; gap: 12px; align-items: center; padding: 3px 4px; border-radius: 6px; cursor: default; }

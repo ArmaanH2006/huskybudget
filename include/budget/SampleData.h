@@ -8,8 +8,8 @@ namespace budget {
 
 // Makes a realistic-looking history of transactions for demos and testing:
 // paychecks, rent, bills, groceries, dining, coffee, and so on, with a few
-// deliberate oddities (a big holiday purchase, a double charge) so the
-// suspicious-transaction detector in week 3 has something to find.
+// deliberate oddities (a big TV purchase and a double charge in the last full
+// month) so the alerts have something to find.
 //
 // Covers `months` whole months ending with the month of `lastDay`, and never
 // creates anything after `lastDay`. The same `seed` always gives the same data.

@@ -119,15 +119,14 @@ std::vector<Transaction> generateSampleData(Date lastDay, int months, unsigned s
         if (rng.between(1, 2) == 1)
             m.spend(rng.between(1, last), rng.cents(800, 4500), "Health", "CVS");
 
-        // ---- Deliberate oddities, for the anomaly detector later
-        if (month == 11) {
-            m.spend(28, Money::fromCents(64999), "Shopping", "Best Buy");     // Black Friday TV
-        }
+        // ---- Deliberate oddities, so the alerts have something to find.
+        // They go in the last full month, so a fresh demo always shows them.
         if (month == 12) {
             for (int n = 4; n > 0; --n)                                       // holiday gifts
                 m.spend(rng.between(5, 22), rng.cents(2500, 9000), "Shopping", rng.pick(stores));
         }
-        if (i == months / 2) {
+        if (i == months - 2) {
+            m.spend(28, Money::fromCents(64999), "Shopping", "Best Buy");     // a big new TV
             Money charge = rng.cents(1800, 3200);                             // charged twice
             int day = rng.between(3, 25);
             m.spend(day, charge, "Dining", "Chipotle");

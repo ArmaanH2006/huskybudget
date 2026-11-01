@@ -34,6 +34,12 @@
   </section>
 
   <section class="panel">
+    <h2>Alerts</h2>
+    <ul id="alerts" class="alerts"></ul>
+    <p id="alerts-empty" class="muted" hidden>Nothing unusual this month.</p>
+  </section>
+
+  <section class="panel">
     <h2>Where the money went</h2>
     <div id="category-chart" class="bars" role="table" aria-label="Spending by category"></div>
     <p id="chart-empty" class="muted" hidden>No spending this month.</p>
@@ -56,7 +62,7 @@
     <p id="form-error" class="error" hidden></p>
   </section>
 
-    <section class="panel">
+  <section class="panel">
     <h2>Import from your bank</h2>
     <p class="muted">Upload a CSV export. It needs <b>Date</b> and <b>Amount</b> columns (negative = money out); Category, Description, and Memo are used if present.</p>
     <form id="import-form">
