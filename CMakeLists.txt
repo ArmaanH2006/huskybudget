@@ -15,6 +15,8 @@ add_library(budget_core
     src/CsvImporter.cpp
     src/BudgetStatus.cpp
     src/Alerts.cpp
+    src/Score.cpp
+    src/WhatIf.cpp
 )
 target_include_directories(budget_core PUBLIC include third_party)
 
@@ -41,6 +43,8 @@ add_executable(tests
     tests/test_csv_importer.cpp
     tests/test_budget_status.cpp
     tests/test_alerts.cpp
+    tests/test_score.cpp
+    tests/test_whatif.cpp
 )
 target_link_libraries(tests PRIVATE budget_core)
 add_test(NAME unit COMMAND tests)

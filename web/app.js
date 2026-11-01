@@ -134,6 +134,55 @@ function budgetMessage(b) {
   return message;
 }
 
+// ---- spending score --------------------------------------------------------
+
+async function loadScore(month) {
+  const s = await getJson("/api/score?month=" + month);
+  document.getElementById("score-total").textContent = s.total;
+  const grade = document.getElementById("score-grade");
+  grade.textContent = s.grade;
+  grade.className = "score-grade grade-" + s.grade;
+
+  // One row per part: name, points, a small bar, and how it was earned.
+  const parts = document.getElementById("score-parts");
+  parts.innerHTML = "";
+  for (const p of s.parts) {
+    const row = document.createElement("div");
+    row.className = "score-part";
+
+    const top = document.createElement("div");
+    top.className = "score-part-top";
+    const name = document.createElement("span");
+    name.textContent = p.name;
+    const points = document.createElement("span");
+    points.className = "score-points";
+    points.textContent = p.points + " / " + p.maxPoints;
+    top.append(name, points);
+
+    const track = document.createElement("div");
+    track.className = "score-track";
+    const fill = document.createElement("div");
+    fill.className = "score-fill";
+    fill.style.width = (p.points / p.maxPoints) * 100 + "%";
+    track.appendChild(fill);
+
+    const detail = document.createElement("p");
+    detail.className = "score-detail";
+    detail.textContent = p.detail;
+
+    row.append(top, track, detail);
+    parts.appendChild(row);
+  }
+
+  const tips = document.getElementById("tips");
+  tips.innerHTML = "";
+  for (const tip of s.tips) {
+    const item = document.createElement("li");
+    item.textContent = tip;
+    tips.appendChild(item);
+  }
+}
+
 // ---- alerts ----------------------------------------------------------------
 
 const alertTitles = {
@@ -237,7 +286,8 @@ async function loadTransactions(month) {
 async function refresh() {
   const month = monthInput.value;
   try {
-    await Promise.all([loadSummary(month), loadBudgets(month), loadAlerts(month), loadTransactions(month)]);
+    await Promise.all([loadSummary(month), loadScore(month), loadBudgets(month),
+                       loadAlerts(month), loadTransactions(month)]);
     markFlaggedRows();                       // needs both the alerts and the table
   } catch (err) {
     document.getElementById("status").textContent = "Couldn't reach the server: " + err.message;
@@ -304,6 +354,55 @@ budgetForm.addEventListener("submit", async (event) => {
   refresh();
 });
 
+// ---- what if I saved instead? ----------------------------------------------
+
+const whatifForm  = document.getElementById("whatif-form");
+const whatifError = document.getElementById("whatif-error");
+
+async function calculateWhatIf() {
+  whatifError.hidden = true;
+  const query = new URLSearchParams(new FormData(whatifForm));   // monthly=200&rate=7&years=10
+  const response = await fetch("/api/whatif?" + query);
+  const r = await response.json();
+  if (!response.ok) {
+    whatifError.textContent = r.error;
+    whatifError.hidden = false;
+    return;
+  }
+
+  document.getElementById("whatif-answer").textContent =
+    "You'd have " + r.finalBalance.display + " after " + r.years + " years: " +
+    r.contributed.display + " you put in, plus " + r.growth.display + " of growth.";
+
+  // One bar per year, so you can see it speed up over time.
+  const chart = document.getElementById("whatif-chart");
+  chart.innerHTML = "";
+  const biggest = r.finalBalance.cents;
+  r.balanceByYear.forEach((balance, i) => {
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    const label = document.createElement("span");
+    label.className = "bar-label";
+    label.textContent = "Year " + (i + 1);
+    const track = document.createElement("div");
+    track.className = "bar-track";
+    const fill = document.createElement("div");
+    fill.className = "bar-fill savings";
+    fill.style.width = (balance.cents / biggest) * 100 + "%";
+    track.appendChild(fill);
+    const value = document.createElement("span");
+    value.className = "bar-value";
+    value.textContent = balance.display;
+    row.append(label, track, value);
+    chart.appendChild(row);
+  });
+}
+
+whatifForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  calculateWhatIf();
+});
+
 // ---- importing a CSV -------------------------------------------------------
 
 const importForm   = document.getElementById("import-form");
@@ -349,3 +448,4 @@ monthInput.value = today().slice(0, 7);
 form.date.value = today();
 monthInput.addEventListener("change", refresh);
 refresh();
+calculateWhatIf();                           // show the example right away

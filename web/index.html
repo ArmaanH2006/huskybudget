@@ -22,6 +22,19 @@
   </section>
 
   <section class="panel">
+    <h2>Spending score</h2>
+    <div class="score">
+      <div class="score-badge">
+        <span class="score-total" id="score-total">–</span>
+        <span class="score-grade" id="score-grade"></span>
+      </div>
+      <div id="score-parts" class="score-parts"></div>
+    </div>
+    <h3>Advice</h3>
+    <ul id="tips" class="tips"></ul>
+  </section>
+
+  <section class="panel">
     <h2>Budgets</h2>
     <div id="budgets"></div>
     <p id="budgets-empty" class="muted" hidden>No budgets yet. Add one below.</p>
@@ -43,6 +56,19 @@
     <h2>Where the money went</h2>
     <div id="category-chart" class="bars" role="table" aria-label="Spending by category"></div>
     <p id="chart-empty" class="muted" hidden>No spending this month.</p>
+  </section>
+
+  <section class="panel">
+    <h2>What if I saved instead?</h2>
+    <form id="whatif-form" class="whatif-form">
+      Save $<input name="monthly" value="200" inputmode="decimal" required>
+      a month at <input name="rate" value="7" inputmode="decimal" required>%
+      for <input name="years" value="10" inputmode="numeric" required> years
+      <button type="submit">Calculate</button>
+    </form>
+    <p id="whatif-error" class="error" hidden></p>
+    <p id="whatif-answer" class="whatif-answer"></p>
+    <div id="whatif-chart" class="bars"></div>
   </section>
 
   <section class="panel">

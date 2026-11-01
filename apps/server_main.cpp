@@ -4,6 +4,7 @@
 //     .\build\huskybudget.exe
 // then open http://localhost:8080 in a browser.
 
+#include <cstdlib>
 #include <ctime>
 #include <filesystem>
 #include <iostream>
@@ -19,7 +20,9 @@
 #include "budget/BudgetStatus.h"
 #include "budget/CsvImporter.h"
 #include "budget/JsonFileRepository.h"
+#include "budget/Score.h"
 #include "budget/Summary.h"
+#include "budget/WhatIf.h"
 
 using nlohmann::json;
 using namespace budget;
@@ -89,6 +92,37 @@ json toApiJson(const Alert& a) {
         {"amount",        moneyJson(a.amount)},
         {"reason",        a.reason},
     };
+}
+
+json toApiJson(const SpendingScore& s) {
+    json parts = json::array();
+    for (const ScorePart& p : s.parts) {
+        parts.push_back({{"name", p.name}, {"points", p.points}, {"maxPoints", p.maxPoints},
+                         {"detail", p.detail}});
+    }
+    return {{"total", s.total}, {"grade", s.grade}, {"parts", parts}, {"tips", s.tips}};
+}
+
+json toApiJson(const WhatIfResult& r) {
+    json byYear = json::array();
+    for (Money m : r.balanceByYear) byYear.push_back(moneyJson(m));
+    return {
+        {"monthly",       moneyJson(r.monthly)},
+        {"rate",          r.annualRatePercent},
+        {"years",         r.years},
+        {"contributed",   moneyJson(r.contributed)},
+        {"finalBalance",  moneyJson(r.finalBalance)},
+        {"growth",        moneyJson(r.growth)},
+        {"balanceByYear", byYear},
+    };
+}
+
+// Reads a plain number like "7" or "6.5". Returns false for "", "abc", or "7%".
+bool parseNumber(const std::string& text, double& out) {
+    if (text.empty()) return false;
+    char* end = nullptr;
+    out = std::strtod(text.c_str(), &end);
+    return end == text.c_str() + text.size();      // the whole text must be the number
 }
 
 // Today's date on this computer.
@@ -381,6 +415,48 @@ int main() {
             out.push_back(toApiJson(a));               // all the rules live in Alerts.cpp
         }
         res.set_content(out.dump(), "application/json");
+    });
+
+    // GET /api/score?month=2026-10
+    // The 0-100 spending score, how each part was earned, and advice.
+    server.Get("/api/score", [&](const httplib::Request& req, httplib::Response& res) {
+        auto month = YearMonth::parse(req.get_param_value("month"));
+        if (!month) return sendError(res, 400, "month must look like 2026-10");
+
+        std::vector<Transaction> history;
+        std::vector<Budget> budgets;
+        {
+            std::lock_guard<std::mutex> lock(repoMutex);
+            history = repo.transactionsInRange(kUserId, Date{1900, 1, 1}, month->lastDay());
+            budgets = repo.budgetsFor(kUserId);
+        }
+
+        SpendingScore score = scoreMonth(history, budgets, *month, today());   // math in Score.cpp
+        res.set_content(toApiJson(score).dump(), "application/json");
+    });
+
+    // GET /api/whatif?monthly=200&rate=7&years=10
+    // "If I saved this much every month, what would it grow to?"
+    // Doesn't touch the stored data, so it doesn't need the lock.
+    server.Get("/api/whatif", [&](const httplib::Request& req, httplib::Response& res) {
+        auto monthly = Money::parse(req.get_param_value("monthly"));
+        if (!monthly || !(Money() < *monthly)) {
+            return sendError(res, 400, "monthly must be a number like 200");
+        }
+
+        double rate = 0;
+        if (!parseNumber(req.get_param_value("rate"), rate) || rate < 0 || rate > 30) {
+            return sendError(res, 400, "rate must be a number from 0 to 30");
+        }
+
+        double years = 0;
+        if (!parseNumber(req.get_param_value("years"), years) || years < 1 || years > 50 ||
+            years != static_cast<int>(years)) {
+            return sendError(res, 400, "years must be a whole number from 1 to 50");
+        }
+
+        WhatIfResult result = whatIf(*monthly, rate, static_cast<int>(years));
+        res.set_content(toApiJson(result).dump(), "application/json");
     });
 
     std::cout << "HuskyBudget running at http://localhost:" << kPort << "\n"
