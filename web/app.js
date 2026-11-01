@@ -80,6 +80,60 @@ function drawCategoryChart(categories, totalCents) {
   }
 }
 
+// One row per budget: name, "spent of limit", a progress bar, and a message.
+// The server already did the math and sorted them most-used first.
+async function loadBudgets(month) {
+  const budgets = await getJson("/api/budgets?month=" + month);
+  const list = document.getElementById("budgets");
+  document.getElementById("budgets-empty").hidden = budgets.length > 0;
+  list.innerHTML = "";
+
+  for (const b of budgets) {
+    const row = document.createElement("div");
+    row.className = "budget " + b.health;          // "on-track", "at-risk", or "over"
+
+    const top = document.createElement("div");
+    top.className = "budget-top";
+    const name = document.createElement("span");
+    name.className = "budget-name";
+    name.textContent = b.category;
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    badge.textContent = { "on-track": "On track", "at-risk": "At risk", "over": "Over" }[b.health];
+    name.appendChild(badge);
+    const amounts = document.createElement("span");
+    amounts.className = "budget-amounts";
+    amounts.textContent = b.spent.display + " of " + b.limit.display + " · " + b.percentUsed + "%";
+    top.append(name, amounts);
+
+    const track = document.createElement("div");
+    track.className = "budget-track";
+    const fill = document.createElement("div");
+    fill.className = "budget-fill";
+    fill.style.width = Math.min(b.percentUsed, 100) + "%";   // a bar can't go past full
+    track.appendChild(fill);
+
+    const note = document.createElement("p");
+    note.className = "budget-note";
+    note.textContent = budgetMessage(b);
+
+    row.append(top, track, note);
+    list.appendChild(row);
+  }
+}
+
+function budgetMessage(b) {
+  if (b.health === "over") {
+    return "Over by " + b.remaining.display.replace("-", "");
+  }
+  if (b.health === "at-risk") {
+    return "At this pace, about " + b.projected.display + " by the end of the month";
+  }
+  let message = b.remaining.display + " left";
+  if (b.tooEarly) message += " · too early in the month to judge the pace";
+  return message;
+}
+
 async function loadTransactions(month) {
   const status = document.getElementById("status");
   const rows   = document.getElementById("rows");
@@ -129,7 +183,7 @@ async function loadTransactions(month) {
 async function refresh() {
   const month = monthInput.value;
   try {
-    await Promise.all([loadSummary(month), loadTransactions(month)]);
+    await Promise.all([loadSummary(month), loadBudgets(month), loadTransactions(month)]);
   } catch (err) {
     document.getElementById("status").textContent = "Couldn't reach the server: " + err.message;
   }
@@ -168,6 +222,71 @@ async function deleteTransaction(t) {
   if (!response.ok) alert("Couldn't delete that transaction.");
   refresh();
 }
+
+// ---- setting a budget ------------------------------------------------------
+
+const budgetForm  = document.getElementById("budget-form");
+const budgetError = document.getElementById("budget-error");
+
+budgetForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  budgetError.hidden = true;
+
+  const data = Object.fromEntries(new FormData(budgetForm));
+  const response = await fetch("/api/budgets", {
+    method: "PUT",                           // PUT: add it, or replace the limit if it exists
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const body = await response.json();
+    budgetError.textContent = body.error;
+    budgetError.hidden = false;
+    return;
+  }
+  budgetForm.reset();
+  refresh();
+});
+
+// ---- importing a CSV -------------------------------------------------------
+
+const importForm   = document.getElementById("import-form");
+const importResult = document.getElementById("import-result");
+
+importForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const file = importForm.file.files[0];
+  if (!file) return;
+
+  const response = await fetch("/api/import", {
+    method: "POST",
+    headers: { "Content-Type": "text/csv" },
+    body: await file.text(),                 // send the file's contents as-is
+  });
+  const body = await response.json();
+
+  importResult.hidden = false;
+  importResult.innerHTML = "";
+  if (response.ok) {
+    importResult.className = "success";
+    importResult.textContent = "Imported " + body.imported + " transactions from " + file.name + ".";
+    importForm.reset();
+    refresh();
+    return;
+  }
+
+  // Show what went wrong, line by line (first 10 problems).
+  importResult.className = "error";
+  importResult.textContent = "Nothing was imported. Fix these and try again:";
+  const list = document.createElement("ul");
+  for (const p of (body.problems || []).slice(0, 10)) {
+    const item = document.createElement("li");
+    item.textContent = "Line " + p.line + ": " + p.message;
+    list.appendChild(item);
+  }
+  importResult.appendChild(list);
+});
 
 // ---- start -----------------------------------------------------------------
 

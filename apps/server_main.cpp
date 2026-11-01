@@ -4,6 +4,7 @@
 //     .\build\huskybudget.exe
 // then open http://localhost:8080 in a browser.
 
+#include <ctime>
 #include <filesystem>
 #include <iostream>
 #include <iterator>
@@ -14,6 +15,8 @@
 #include "httplib.h"
 #include "json.hpp"
 
+#include "budget/BudgetStatus.h"
+#include "budget/CsvImporter.h"
 #include "budget/JsonFileRepository.h"
 #include "budget/Summary.h"
 
@@ -60,6 +63,26 @@ json toApiJson(const YearMonth& month, const MonthSummary& s) {
         {"transactionCount",   s.transactionCount},
         {"spendingByCategory", categories},
     };
+}
+
+json toApiJson(const BudgetStatus& b) {
+    return {
+        {"category",    b.category},
+        {"limit",       moneyJson(b.limit)},
+        {"spent",       moneyJson(b.spent)},
+        {"remaining",   moneyJson(b.remaining)},
+        {"projected",   moneyJson(b.projected)},
+        {"percentUsed", b.percentUsed},
+        {"tooEarly",    b.tooEarly},
+        {"health",      budgetHealthName(b.health)},
+    };
+}
+
+// Today's date on this computer.
+Date today() {
+    std::time_t now = std::time(nullptr);
+    std::tm local = *std::localtime(&now);
+    return Date{local.tm_year + 1900, local.tm_mon + 1, local.tm_mday};
 }
 
 void sendError(httplib::Response& res, int status, const std::string& message) {
@@ -184,6 +207,7 @@ int main() {
 
     httplib::Server server;
     server.set_mount_point("/", "./web");
+    server.set_payload_max_length(5 * 1024 * 1024);    // refuse uploads over 5 MB
 
     server.Get("/api/health", [](const httplib::Request&, httplib::Response& res) {
         res.set_content(R"({"status":"ok"})", "application/json");
@@ -235,6 +259,32 @@ int main() {
         res.status = 204;   // "No Content": it worked, nothing to send back
     });
 
+        // POST /api/import     body: the text of a CSV file
+    //
+    // All or nothing: if any row has a problem, nothing is imported and every
+    // problem is reported, so the user can fix the file and try again without
+    // ending up with half an import.
+    server.Post("/api/import", [&](const httplib::Request& req, httplib::Response& res) {
+        ImportResult result = parseCsv(req.body, kUserId);
+
+        if (!result.ok()) {
+            json errors = json::array();
+            for (const ImportError& e : result.errors) {
+                errors.push_back({{"line", e.line}, {"message", e.message}});
+            }
+            res.status = 400;
+            res.set_content(json{{"error", "nothing was imported"}, {"problems", errors}}.dump(),
+                            "application/json");
+            return;
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(repoMutex);
+            for (const Transaction& t : result.transactions) repo.addTransaction(t);
+        }
+        res.set_content(json{{"imported", result.transactions.size()}}.dump(), "application/json");
+    });
+
     // GET /api/summary?month=2026-10
     server.Get("/api/summary", [&](const httplib::Request& req, httplib::Response& res) {
         auto month = YearMonth::parse(req.get_param_value("month"));
@@ -248,6 +298,56 @@ int main() {
 
         MonthSummary summary = summarize(txns);    // all the math lives in Summary.cpp
         res.set_content(toApiJson(*month, summary).dump(), "application/json");
+    });
+
+    // GET /api/budgets?month=2026-10
+    // Every budget with how much is spent, what's left, and the end-of-month guess.
+    server.Get("/api/budgets", [&](const httplib::Request& req, httplib::Response& res) {
+        auto month = YearMonth::parse(req.get_param_value("month"));
+        if (!month) return sendError(res, 400, "month must look like 2026-10");
+
+        std::vector<Budget> budgets;
+        std::vector<Transaction> txns;
+        {
+            std::lock_guard<std::mutex> lock(repoMutex);
+            budgets = repo.budgetsFor(kUserId);
+            txns    = repo.transactionsInRange(kUserId, month->firstDay(), month->lastDay());
+        }
+
+        json out = json::array();
+        for (const BudgetStatus& b : evaluateBudgets(budgets, txns, *month, today())) {
+            out.push_back(toApiJson(b));               // all the math lives in BudgetStatus.cpp
+        }
+        res.set_content(out.dump(), "application/json");
+    });
+
+    // PUT /api/budgets     body: {"category":"Coffee", "limit":"60"}
+    // Adds a budget, or changes the limit if that category already has one.
+    server.Put("/api/budgets", [&](const httplib::Request& req, httplib::Response& res) {
+        json j = json::parse(req.body, nullptr, /*allow_exceptions=*/false);
+        if (j.is_discarded() || !j.is_object()) return sendError(res, 400, "body must be a JSON object");
+
+        auto text = [&](const char* key) -> std::string {
+            if (!j.contains(key) || !j[key].is_string()) return "";
+            return j[key].get<std::string>();
+        };
+
+        Budget b;
+        b.userId   = kUserId;
+        b.category = text("category");
+        if (b.category.empty()) return sendError(res, 400, "category is required");
+
+        auto limit = Money::parse(text("limit"));
+        if (!limit)              return sendError(res, 400, "limit must be a number like 200");
+        if (!(Money() < *limit)) return sendError(res, 400, "limit must be more than $0.00");
+        b.monthlyLimit = *limit;
+
+        {
+            std::lock_guard<std::mutex> lock(repoMutex);
+            repo.setBudget(b);
+        }
+        res.set_content(json{{"category", b.category}, {"limit", moneyJson(b.monthlyLimit)}}.dump(),
+                        "application/json");
     });
 
     std::cout << "HuskyBudget running at http://localhost:" << kPort << "\n"

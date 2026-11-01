@@ -4,9 +4,11 @@
 //     .\build\seed.exe            (refuses if data already exists)
 //     .\build\seed.exe --force    (replaces existing data)
 
+#include <cstdint>
 #include <ctime>
 #include <filesystem>
 #include <iostream>
+#include <iterator>
 #include <string>
 
 #include "budget/JsonFileRepository.h"
@@ -45,7 +47,17 @@ int main(int argc, char* argv[]) {
     JsonFileRepository repo(path);
     for (const Transaction& t : transactions) repo.addTransaction(t);
 
+    // A few starter budgets so the Budgets section isn't empty.
+    struct Starter { const char* category; std::int64_t limitCents; };
+    const Starter starters[] = {
+        {"Groceries", 40000}, {"Dining", 25000}, {"Shopping", 20000},
+        {"Transportation", 15000}, {"Coffee", 6000}, {"Entertainment", 7500},
+    };
+    for (const Starter& s : starters) {
+        repo.setBudget(Budget{kUserId, s.category, Money::fromCents(s.limitCents)});
+    }
+
     std::cout << "Wrote " << transactions.size() << " transactions covering the last 12 months to "
-              << path << "\n";
+              << path << ", plus " << std::size(starters) << " starter budgets.\n";
     return 0;
 }

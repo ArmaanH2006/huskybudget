@@ -21,7 +21,19 @@
     <div class="card"><span class="label">Net</span><span class="value" id="net">–</span></div>
   </section>
 
-    <section class="panel">
+  <section class="panel">
+    <h2>Budgets</h2>
+    <div id="budgets"></div>
+    <p id="budgets-empty" class="muted" hidden>No budgets yet. Add one below.</p>
+    <form id="budget-form">
+      <input name="category" placeholder="Category" list="categories" required>
+      <input name="limit" placeholder="Monthly limit" inputmode="decimal" required>
+      <button type="submit">Save budget</button>
+    </form>
+    <p id="budget-error" class="error" hidden></p>
+  </section>
+
+  <section class="panel">
     <h2>Where the money went</h2>
     <div id="category-chart" class="bars" role="table" aria-label="Spending by category"></div>
     <p id="chart-empty" class="muted" hidden>No spending this month.</p>
@@ -42,6 +54,16 @@
     </form>
     <datalist id="categories"></datalist>
     <p id="form-error" class="error" hidden></p>
+  </section>
+
+    <section class="panel">
+    <h2>Import from your bank</h2>
+    <p class="muted">Upload a CSV export. It needs <b>Date</b> and <b>Amount</b> columns (negative = money out); Category, Description, and Memo are used if present.</p>
+    <form id="import-form">
+      <input type="file" name="file" accept=".csv,text/csv" required>
+      <button type="submit">Import</button>
+    </form>
+    <div id="import-result" hidden></div>
   </section>
 
   <section class="panel">

@@ -17,6 +17,12 @@ input[name="amount"]   { width: 150px; }
 input[name="category"], input[name="merchant"] { flex: 1; min-width: 140px; }
 button[type="submit"]  { background: #1f6feb; color: #fff; border-color: #1f6feb; cursor: pointer; }
 
+input[name="limit"]    { width: 150px; }
+input[type="file"]     { flex: 1; min-width: 200px; }
+#import-result         { margin-top: 10px; }
+#import-result ul      { margin: 6px 0 0; padding-left: 20px; color: #c62828; }
+.success               { color: #2e7d32; }
+
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid #e4e7eb; }
 th    { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #616e7c; }
@@ -27,6 +33,22 @@ th    { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color
 .error { color: #c62828; margin: 10px 0 0; }
 .delete { border: none; background: none; color: #9aa5b1; cursor: pointer; font-size: 18px; padding: 0 6px; }
 .delete:hover { color: #c62828; }
+
+/* ---- Budgets: one row per budget, colored by how it's doing ----------- */
+#budgets        { display: flex; flex-direction: column; gap: 14px; margin-bottom: 14px; }
+.budget-top     { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; align-items: baseline; font-size: 14px; }
+.budget-name    { font-weight: 600; }
+.budget-amounts { color: #616e7c; font-variant-numeric: tabular-nums; }
+.badge          { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; margin-left: 8px; }
+.budget-track   { height: 10px; background: #eef1f4; border-radius: 5px; margin: 6px 0 4px; overflow: hidden; }
+.budget-fill    { height: 100%; border-radius: 5px; min-width: 2px; }
+.budget-note    { font-size: 13px; color: #616e7c; margin: 0; }
+.on-track .budget-fill { background: #2e7d32; }
+.on-track .badge       { background: #e8f5e9; color: #2e7d32; }
+.at-risk  .budget-fill { background: #d99a00; }
+.at-risk  .badge       { background: #fff4d6; color: #8a6100; }
+.over     .budget-fill { background: #c62828; }
+.over     .badge       { background: #fdecea; color: #c62828; }
 
 /* ---- Spending by category: one horizontal bar per category -------------- */
 .bars      { display: flex; flex-direction: column; gap: 4px; }
